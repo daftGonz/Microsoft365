@@ -60,7 +60,7 @@ $CredentialName = 'CREDENTIAL-NAME-HERE'
 $AdminGroup = 'MAIL-ENABLED-SECURITY-GROUP-HERE'
 
 # Office 1 details
-$Office1RoomList = 'roomlist1@contoso.com
+$Office1RoomList = 'roomlist1@contoso.com'
 $Office1Building = 'Bldg 1'
 $Office1Street = '1 Microsoft Way'
 $Office1City = 'Redmond'
@@ -69,7 +69,7 @@ $Office1Zipcode = '13464'
 $Office1Country = 'United States'
 
 # Office 2 details
-$Office2RoomList = 'roomlist2@contoso.com
+$Office2RoomList = 'roomlist2@contoso.com'
 $Office2Building = 'Bldg 2'
 $Office2Street = '1 Microsoft Way'
 $Office2City = 'Redmond'
@@ -78,7 +78,7 @@ $Office2Zipcode = '13464'
 $Office2Country = 'United States'
 
 # Office 3 details
-$Office3RoomList = 'roomlist2@contoso.com
+$Office3RoomList = 'roomlist2@contoso.com'
 $Office3Building = 'Bldg 3'
 $Office3Street = '1 Microsoft Way'
 $Office3City = 'Redmond'
