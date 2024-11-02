@@ -1,21 +1,20 @@
 <# 
 .SYNOPSIS
-Ingests webhook information and creates a reservable resource in Microsoft Exchange for a specified organization.
+Ingests webhook information sent from Freshservice Workflow Automator and creates a reservable resource in Microsoft Exchange given information provided.
 
 .DESCRIPTION 
-A long description of how the script works and how to use it.
+The script is intended to ingest webhook data sent from a defined Freshservice Workflow in the context of an Azure Runbook. 
+In this case, a worklfow is defined in my Freshservice tenant to trigger when a requestor requests a published service catalog item. 
 
-.NOTES 
-Information about the environment, things to need to be consider and other information.
+The workflow subsequently pulls the information provided from the service request form and submits JSON data to a defined Webhook URL 
+associated with the Azure Runbook. Once the webhook data is received, the Azure Runbook will then execute this script and ingest data from
+the webhook data and create an Exchange Workspace Resource.
 
 .COMPONENT 
-Information about PowerShell Modules to be required.
+Requires the installation or import of the ExchangeOnlineManagement PowerShell module.
 
-.LINK 
-Useful Link to ressources or others.
-
-.Parameter ParameterName 
-Description for a parameter in param definition section. Each parameter requires a separate description. The name in the description and the parameter section must match. 
+.Parameter WebhookData 
+Ingests expected webhook data from Freshservice to convert and assign to PowerShell objects.
 #>
 
 Param(
@@ -23,7 +22,7 @@ Param(
 [Object]$WebhookData
 )
 
-#Import-Module ExchangeOnlineManagement
+Import-Module ExchangeOnlineManagement
 
 if ($WebhookData)
 {  
