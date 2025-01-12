@@ -19,7 +19,7 @@ Webhook data sent to Azure Runbook trigger from Freshservice Workflow Automator.
 .PARAMETER AsJson
 Properties of Workspace needing to be created. Allowed properties can be found in the $JsonSchema variable set below.
 
-.PARAMETER Office_Of / Office_Cu
+.PARAMETER Office
 Office location where a given Workspace resides (e.g., Chicago Office).
 
 .PARAMETER OfficeId
@@ -28,22 +28,22 @@ Unique identifier of an office room in a given remote office (e.g., a2000).
 .PARAMETER CubicleId
 Unique identifier of an office room in a given remote office (e.g., ws1000).
 
-.PARAMETER FloorNum_Of / FloorNum_Cu
+.PARAMETER FloorNum_Of
 Numerical value of floor number where a given Workspace resides (e.g., 2).
 
-.PARAMETER FloorLabel_Of / FloorLabel_Cu
+.PARAMETER FloorLabel
 Text value of a floor number where a given Workspace resides (e.g., Second Floor).
 
-.PARAMETER Capacity_Of / Capacity_Cu
+.PARAMETER Capacity
 Enforced capacity value for a given Workspace. Restricts organizer from inviting other recipients.
 
-.PARAMETER WheelChairAccessible_Of / WheelChairAccessible_Cu
+.PARAMETER WheelChairAccessible
 Switch value if a given Workspace is wheelchair accessible.
 
-.PARAMETER Moderators_Of / Moderators_Of
+.PARAMETER Moderators
 Email addresses of moderators needed to approve booking requests using delegation and or granted editor permissions to the resource calendar. 
 
-.PARAMETER CalendarPermissions_Of / CalendarPermissions_Cu
+.PARAMETER CalendarPermissions
 Rights necessary for the moderators (e.g., Editor, Delegate)
 
 #>
