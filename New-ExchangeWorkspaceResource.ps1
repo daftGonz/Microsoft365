@@ -14,10 +14,41 @@ the webhook data and create an Exchange Workspace Resource.
 Requires the installation or import of the ExchangeOnlineManagement PowerShell module.
 
 .PARAMETER WebhookData
-Ingests expected webhook data from Freshservice to convert and assign to PowerShell objects.
+Webhook data sent to Azure Runbook trigger from Freshservice Workflow Automator.
+
+.PARAMETER AsJson
+Properties of Workspace needing to be created. Allowed properties can be found in the $JsonSchema variable set below.
+
+.PARAMETER Office_Of / Office_Cu
+Office location where a given Workspace resides (e.g., Chicago Office).
+
+.PARAMETER OfficeId
+Unique identifier of an office room in a given remote office (e.g., a2000).
+
+.PARAMETER CubicleId
+Unique identifier of an office room in a given remote office (e.g., ws1000).
+
+.PARAMETER FloorNum_Of / FloorNum_Cu
+Numerical value of floor number where a given Workspace resides (e.g., 2).
+
+.PARAMETER FloorLabel_Of / FloorLabel_Cu
+Text value of a floor number where a given Workspace resides (e.g., Second Floor).
+
+.PARAMETER Capacity_Of / Capacity_Cu
+Enforced capacity value for a given Workspace. Restricts organizer from inviting other recipients.
+
+.PARAMETER WheelChairAccessible_Of / WheelChairAccessible_Cu
+Switch value if a given Workspace is wheelchair accessible.
+
+.PARAMETER Moderators_Of / Moderators_Of
+Email addresses of moderators needed to approve booking requests using delegation and or granted editor permissions to the resource calendar. 
+
+.PARAMETER CalendarPermissions_Of / CalendarPermissions_Cu
+Rights necessary for the moderators (e.g., Editor, Delegate)
+
 #>
 
-[CmdletBinding(DefaultParameterSetName = "WebhookOnly")]
+[CmdletBinding(DefaultParameterSetName = "WebhookTrigger")]
 param (
     # Parameter for only webhook data
     [Parameter(ParameterSetName = "WebhookTrigger", Mandatory = $true)]
@@ -29,54 +60,56 @@ param (
 
     # Parameter set for Office type.
     [Parameter(ParameterSetName = "OfficeSet", Mandatory = $true)]
-    [String]$Office_Of,
+    [Parameter(ParameterSetName = "CubicleSet",Mandatory = $true)]
+    [String]$Office,
 
-    [Parameter(ParameterSetName = "OfficeSet")]
+    [Parameter(ParameterSetName = "OfficeSet",Mandatory = $true)]
     [String]$OfficeId,
 
-    [Parameter(ParameterSetName = "OfficeSet")]
-    [Int]$FloorNum_Of,
-
-    [Parameter(ParameterSetName = "OfficeSet")]
-    [String]$FloorLabel_Of,
-
-    [Parameter(ParameterSetName = "OfficeSet")]
-    [Int]$Capacity_Of,
-
-    [Parameter(ParameterSetName = "OfficeSet")]
-    [Switch]$WheelChairAccessible_Of,
-
-    [Parameter(ParameterSetName = "OfficeSet")]
-    [Array]$Delegates_Of,
-
-    [Parameter(ParameterSetName = "OfficeSet")]
-    [Array]$CalendarPermissions_Of,
-
-    # Parameter set for Cubicle type.
-    [Parameter(ParameterSetName = "CubicleSet", Mandatory = $true)]
-    [String]$Office_Cu,
-
-    [Parameter(ParameterSetName = "CubicleSet")]
+    [Parameter(ParameterSetName = "CubicleSet",Mandatory = $true)]
     [String]$CubicleId,
 
-    [Parameter(ParameterSetName = "CubicleSet")]
-    [Int]$FloorNum_Cu,
+    [Parameter(ParameterSetName = "OfficeSet",Mandatory = $true)]
+    [Parameter(ParameterSetName = "CubicleSet",Mandatory = $true)]
+    [Int]$FloorNum,
 
-    [Parameter(ParameterSetName = "CubicleSet")]
-    [String]$FloorLabel_Cu,
+    [Parameter(ParameterSetName = "OfficeSet",Mandatory = $true)]
+    [Parameter(ParameterSetName = "CubicleSet",Mandatory = $true)]
+    [String]$FloorLabel,
 
-    [Parameter(ParameterSetName = "CubicleSet")]
-    [Int]$Capacity_Cu,
+    [Parameter(ParameterSetName = "OfficeSet",Mandatory = $true)]
+    [Parameter(ParameterSetName = "CubicleSet",Mandatory = $true)]
+    [Int]$Capacity,
 
+    [Parameter(ParameterSetName = "OfficeSet")]
     [Parameter(ParameterSetName = "CubicleSet")]
-    [Switch]$WheelChairAccessible_Cu,
+    [Switch]$WheelChairAccessible,
 
+    [Parameter(ParameterSetName = "OfficeSet")]
     [Parameter(ParameterSetName = "CubicleSet")]
-    [Array]$Delegates_Cu,
+    [ValidateScript(
+    {
+      if (-not $PSBoundParameters.ContainsKey("CalendarPermissions"))
+      {
+        throw "Moderators requires CalendarPermissions to be provided."
+      }
+      $true
+    })]
+    [Array]$Moderators,
 
+    [Parameter(ParameterSetName = "OfficeSet")]
     [Parameter(ParameterSetName = "CubicleSet")]
-    [Array]$CalendarPermissions_Cu
-)
+    [ValidateScript(
+    {
+      if (-not $PSBoundParameters.ContainsKey('Moderators')) 
+      {
+          throw "CalendarPermissions requires Moderators to be provided."
+      }
+        $true
+      })]
+    [Array]$CalendarPermissions
+    )
+
 
 $JsonSchema = '{
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -106,9 +139,9 @@ $JsonSchema = '{
       "type": "string",
       "description": "The unique identifier for the office."
     },
-    "Delegates": {
+    "Moderators": {
       "type": "string",
-      "description": "The delegate(s) associated with the office."
+      "description": "The moderator(s) associated with the office."
     },
     "CalendarPermissions": {
       "type": "array",
@@ -130,7 +163,7 @@ $JsonSchema = '{
       "description": "The identifier for a related service request item."
     }
   },
-  "required": ["Office", "FloorNum", "FloorLabel", "Capacity", "WheelChairAccessible", "Delegates", "CalendarPermissions"],
+  "required": ["Office", "FloorNum", "FloorLabel", "Capacity", "WheelChairAccessible", "Moderators", "CalendarPermissions"],
   "oneOf": [
     {
       "required": ["OfficeId"],
@@ -147,31 +180,25 @@ $JsonSchema = '{
   ]
 }'
 
-# Update variable names depending on chosen parameter set.
-if ($OfficeSet)
-{
-  $Office = $Office_Of
-  $FloorNum = $FloorNum_Of
-  $FloorLabel = $FloorLabel_Of
-  $Capacity = $Capacity_Of
-  $WheelChairAccessible = $WheelChairAccessible_Of
-  $OfficeId = $OfficeId
-  $Delegates = $Delegates_Of
-  $CalendarPermissions = $CalendarPermissions_Of
-}
-elseif ($CubicleSet)
-{
-  $Office = $Office_Cu
-  $FloorNum = $FloorNum_Cu
-  $FloorLabel = $FloorLabel_Cu
-  $Capacity = $Capacity_Cu
-  $WheelChairAccessible = $WheelChairAccessible_Cu
-  $CubicleId = $CubicleId
-  $Delegates = $Delegates_Cu
-  $CalendarPermissions = $CalendarPermissions_Cu
-}
+<# Checks parameter set and set booleans depending on set chosen.
+switch ($PSCmdlet.ParameterSetName) {
+
+  'OfficeSet' {
+    if ($OfficeId) 
+    {
+      $IsOffice = $true 
+    }
+  }
+  'CubicleSet' {
+    if ($CubicleId)
+    {
+      $IsCubicle = $true
+    }
+  }
+}#>
+
 # Populate variables with webhook data, if provided.
-elseif ($WebhookData)
+if ($WebhookData)
 {
   # Outputs request header details.
   Write-Output $WebhookData.RequestHeader
@@ -192,7 +219,7 @@ elseif ($WebhookData)
         $WheelChairAccessible = $PayloadRequestBody.wheelchairaccessible
         $OfficeId = $PayloadRequestBody.officeid.Trim()
         $CubicleId = $PayloadRequestBody.cubicleid.Trim()
-        $Delegates = $PayloadRequestBody.delegates.Split(',').Trim()
+        $Moderators = $PayloadRequestBody.Moderators.Split(',').Trim()
         $CalendarPermissions = $PayloadRequestBody.calendarpermissions.Split(',').Trim()
         $TicketID = $PayloadRequestBody.ticketid.Trim()
         $ServiceRequestItemID = ($PayloadRequestBody.itemrequestid -replace '[\[\]]', '').Trim()
@@ -220,7 +247,7 @@ elseif ($JsonOnly)
       $WheelChairAccessible = $PSObject.wheelchairaccessible
       $OfficeId = ($PSObject.officeid).Trim()
       $CubicleId = ($PSObject.cubicleid).Trim()
-      $Delegates = ($PSObject.delegates.Split(',')).Trim()
+      $Moderators = ($PSObject.Moderators.Split(',')).Trim()
       $CalendarPermissions = ($PSObject.calendarpermissions).Trim().Split(',')
 
     }
@@ -234,17 +261,17 @@ elseif ($JsonOnly)
 # Import Exchange PowerShell module to session.
 Import-Module ExchangeOnlineManagement
 
+# [REQUIRED] Set organization specific office and cubicle abbreviation values as well as resource type to be created.
+$OfficeAbbr = 'OF'
+$CubicleAbbr = 'WS'
+$ResourceType = 'Workspace'
+
 # [REQUIRED] Set organization name, domain, and Azure subscription ID if using managed identity.
 $OrganizationName = 'ORGANIZATION-NAME-HERE'
 $FSDomain = 'FRESH-SERVICE-DOMAIN-HERE'
 $DomainName = 'M365-DEFAULT-DOMAIN-HERE'
 $SubscriptionId = 'AZURE-SUBSCRIPTION-ID-HERE'
 $AdminGroup = 'MAIL-ENABLED-SECURITY-GROUP-HERE'
-
-# [REQUIRED] Set office and cubicle abbreviation values as well as resource type to be created.
-$OfficeAbbr = 'OF'
-$CubicleAbbr = 'WS'
-$ResourceType = 'Workspace'
 
 # [OPTIONAL] Set Keyvault and credential name variables for retrieving credentials from Azure Keyvault to authenticate to other API supported systems such as an ITSM.
 $KeyvaultName = 'KEY-VAULT-NAME-HERE'
@@ -339,13 +366,12 @@ if ($ValidWebhookData)
   }
 
     # Set username using office abbreviation code and office ID #.
-    if ($OfficeId)
+    if ($IsOffice)
     {
-      $IsOffice = $true
       $Username = ($Office.Bldg.ToLower() + "-" + $OfficeAbbr.ToLower() + "-" + $OfficeId)
       $DisplayName = ($OfficeAbbr + " " + $OfficeId.ToUpper())
     }
-    if ($CubicleId)
+    if ($IsCubicle)
     {
       $Username = ($Office.Bldg.ToLower() + "-" + $CubicleAbbr.ToLower() + "-" + $CubicleId)
       $DisplayName = ($CubicleAbbr + " " + $CubicleId.ToUpper())
@@ -454,7 +480,7 @@ if ($ValidWebhookData)
     {
       try {
         # Connect to Exchange Online as administrator.
-        Connect-ExchangeOnline -Organization $DomainName -ShowBanner:$false
+        Connect-ExchangeOnline -ShowBanner:$false
       }
       catch {
         Write-Error -Message "$($Error[0].Exception.Message)"
@@ -462,24 +488,24 @@ if ($ValidWebhookData)
       }
     }
     # Set parameters for Set-CalendarProcessing cmdlet based on if delegate is provided.
-    if ($Delegates)
+    if ($Moderators)
     {
-      $ValidDelegates = $null
-      $InvalidDelegates = $null
+      $ValidModerators = $null
+      $InvalidModerators = $null
 
-      foreach ($Delegate in $Delegates)
+      foreach ($Moderator in $Moderators)
       {
-        Write-Output "Looping through delegates for validation. Current delegate: $Delegate"
+        Write-Output "Looping through moderators for validation. Current moderator: $Moderator"
         try 
         {
             $OldPref = $global:ErrorActionPreference
             $global:ErrorActionPreference = 'Stop'
 
             # Validate delegate email address before setting processing rules.
-            Get-EXOMailbox -Identity $Delegate | Out-Null
+            Get-EXOMailbox -Identity $Moderator | Out-Null
 
             # Concatenate valid delegate to string.
-            $ValidDelegates = $ValidDelegates + $Delegate + ","
+            $ValidModerators = $ValidModerators + $Moderator + ","
             
             # Loop through each permission provided in request
             foreach ($Permission in $CalendarPermissions)
@@ -488,7 +514,7 @@ if ($ValidWebhookData)
                 if ($Permission -eq "Editor")
                 {
                     $EditorRights = $true
-                    Write-Output "Editor permissions assigned to $Delegate"
+                    Write-Output "Editor permissions assigned to $Moderator"
                 }
 
                 # Add delegate approver to resource.
@@ -496,17 +522,17 @@ if ($ValidWebhookData)
                 {
                     # Set delegate rights boolean to true.
                     $DelegateRights = $true
-                    Write-Output "Delegate permissions assigned to $Delegate"
+                    Write-Output "Delegate permissions assigned to $Moderator"
                 }
             }
         }
         catch 
         {
             # Write error output to stream.
-            Write-Error "Unable to find delegate $Delegate in Exchange. Skipping delegate assignment" # $Error[0].Exception.Message
+            Write-Error "Unable to find user $Moderator in Exchange. Skipping moderator assignment" # $Error[0].Exception.Message
 
-            # Concatenate invalid delegate to string.
-            $InvalidDelegates = $InvalidDelegates + $Delegate + ","
+            # Concatenate invalid moderator to string.
+            $InvalidModerators = $InvalidModerators + $Moderator + ","
         }
         finally 
         {
@@ -515,14 +541,14 @@ if ($ValidWebhookData)
         }
       }
 
-      # Check if delegate approver flag was added in request.
-      if ($DelegateRights -and $ValidDelegates)
+      # Check if delegate flag was added in request.
+      if ($DelegateRights -and $ValidModerators)
       {
           # Write to output stream results of check.
-          Write-Output "Valid delegates: " + $ValidDelegates.Trim(',')
+          Write-Output "Valid moderators: " + $ValidModerators.Trim(',')
 
           # Parameters for Set-CalendarProcessing cmdlet.
-          $SetCalendarProcessingParams += @{ ResourceDelegates = $ValidDelegates.Trim(',') }
+          $SetCalendarProcessingParams += @{ ResourceDelegates = $ValidModerators.Trim(',') }
       }
      }
 
@@ -534,7 +560,7 @@ if ($ValidWebhookData)
       $NewPrivateNoteSuccessBody = '{ "body":"<div>The resource ' + '<b>' + $DisplayName + ' (' + $Username + ')' + '</b>' + ' has successfully created. <br><br> Please allow up to 24 hours for the resource to appear in Outlook Room Finder.</div>", "private":true }'
       $NewPrivateNoteFailureBody = '{ "body":"<div>The resource ' + '<b>' + $DisplayName + ' (' + $Username + ')' + '</b>' + ' has failed to create. <br><br> Please reach out to your systems administrator for further assistance. Do <b>NOT</b> re-submit this request.</div>", "private":true }'
       $NewPrivateNoteResourceExistsBody = '{ "body":"The resource ' + '<b>' + $DisplayName + ' (' + $Username + ')' + '</b>' + ' already exists. <br><br> Please check the information provided and try again by creating a new service request ticket.</div>", "private":true }'
-      $InvalidDelegateBody = '{ "body":"<div>The delegate(s) ' + '<b>' + $InvalidDelegates.Trim(',') + '</b>' + ' do not contain valid email address(es).<br><br> Please reach out to your systems administrator for further assistance. Do <b>NOT</b> re-submit this request.</div>", "private":true }'
+      $InvalidModeratorBody = '{ "body":"<div>The moderator(s) ' + '<b>' + $InvalidModerators.Trim(',') + '</b>' + ' do not contain valid email address(es).<br><br> Please reach out to your systems administrator for further assistance. Do <b>NOT</b> re-submit this request.</div>", "private":true }'
       $UpdateRequestedItemStatusCancelledBody = '{ "stage":3 }'
       $UpdateRequestedItemStatusFulfilledBody = '{ "stage":4 }'
     }
@@ -575,9 +601,9 @@ if ($ValidWebhookData)
     # Sets delegate permissions on resource mailbox if flag for approver rights are provided in the initial request.
     elseif ($EditorRights)
     {
-      foreach ($Delegate in $ValidDelegates.Split(','))
+      foreach ($Moderator in $ValidModerators.Split(','))
       {
-          try { Add-DistributionGroupMember -Identity $AdminGroup -Member $Delegate } catch { if ($Error[0].Exception.Message -match "Microsoft.Exchange.Management.Tasks.MemberAlreadyExistsException") { Write-Warning "User is already a member of group $AdminGroup" } else { Write-Error       Write-Error -Message "$($Error[0].Exception.Message)" } }
+          try { Add-DistributionGroupMember -Identity $AdminGroup -Member $Moderator } catch { if ($Error[0].Exception.Message -match "Microsoft.Exchange.Management.Tasks.MemberAlreadyExistsException") { Write-Warning "User is already a member of group $AdminGroup" } else { Write-Error       Write-Error -Message "$($Error[0].Exception.Message)" } }
       }
 
       # Assigns appropriate mailbox permissions to admin group.
@@ -622,16 +648,16 @@ else
   Write-Output "Resource already exists. Please re-try using a unique indentifier to proceed."
 }
 
-if ($InvalidDelegates)
+if ($InvalidModerators)
 {
   if ($ValidWebhookData)
   {
-    # Create private note indicating that the resource delegate was not applied due to an invalid email address.
-    Invoke-WebRequest -Uri $FreshserviceCreatePrivateNoteUpdateURL -Headers $Headers -Method Post -Body $InvalidDelegateBody -UseBasicParsing
+    # Create private note indicating that the resource moderator was not applied due to an invalid email address.
+    Invoke-WebRequest -Uri $FreshserviceCreatePrivateNoteUpdateURL -Headers $Headers -Method Post -Body $InvalidModeratorBody -UseBasicParsing
   }
 
-  # Write output to screen indicating that one or more resource delegates were not applied to the resource due to an invalid identity.
-  Write-Output "Unable to assign one or more delegates due to an invalid identity."
+  # Write output to screen indicating that one or more resource moderators were not applied to the resource due to an invalid identity.
+  Write-Output "Unable to assign one or more moderators due to an invalid identity."
 }
 
 # Disconnect from Exchange Online session.
