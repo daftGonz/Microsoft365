@@ -110,6 +110,63 @@ param (
     [Array]$CalendarPermissions
     )
 
+# Import Exchange PowerShell module to session.
+Import-Module ExchangeOnlineManagement
+
+# [REQUIRED] Set organization specific office and cubicle abbreviation values as well as resource type to be created.
+$OfficeAbbr = 'OF'
+$CubicleAbbr = 'WS'
+$ResourceType = 'Workspace'
+
+# [REQUIRED] Set organization name, domain, and Azure subscription ID if using managed identity.
+$OrganizationName = 'ORGANIZATION-NAME-HERE'
+$FSDomain = 'FRESH-SERVICE-DOMAIN-HERE'
+$DomainName = 'M365-DEFAULT-DOMAIN-HERE'
+$SubscriptionId = 'AZURE-SUBSCRIPTION-ID-HERE'
+$AdminGroup = 'MAIL-ENABLED-SECURITY-GROUP-HERE'
+
+# [OPTIONAL] Set Keyvault and credential name variables for retrieving credentials from Azure Keyvault to authenticate to other API supported systems such as an ITSM.
+$KeyvaultName = 'KEY-VAULT-NAME-HERE'
+$CredentialName = 'CREDENTIAL-NAME-HERE'
+
+# [REQUIRED] Office locations
+$OfficeLocations = @(
+
+# Office 1 details
+  @{
+    Name = 'Main Campus'
+    RoomList = 'roomlist1@contoso.com'
+    Building = 'Bldg 1'
+    Street = '2 Microsoft Way'
+    City = 'Redmond'
+    State = 'WA'
+    Zipcode = '13464'
+    Country = 'United States'
+  }
+
+  # Office 2 details
+  @{
+    Name = 'Engineering Bldg'
+    RoomList = 'roomlist2@contoso.com'
+    Building = 'Bldg 2'
+    Street = '2 Microsoft Way'
+    City = 'Redmond'
+    State = 'WA'
+    Zipcode = '13464'
+    Country = 'United States'
+  }
+  # Office 3 details
+  @{
+    Name = 'Research & Development Bldg'
+    RoomList = 'roomlist3@contoso.com'
+    Building = 'Bldg 3'
+    Street = '3 Microsoft Way'
+    City = 'Redmond'
+    State = 'WA'
+    Zipcode = '13464'
+    Country = 'United States'
+  }
+)
 
 $JsonSchema = '{
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -223,6 +280,14 @@ if ($WebhookData)
         $CalendarPermissions = $PayloadRequestBody.calendarpermissions.Split(',').Trim()
         $TicketID = $PayloadRequestBody.ticketid.Trim()
         $ServiceRequestItemID = ($PayloadRequestBody.itemrequestid -replace '[\[\]]', '').Trim()
+
+        # [OPTIONAL] Set API URLs for Freshservice tenant with unique ticket ID and service request item ID.
+
+        # Private note URL with unique ticket ID.
+        $FreshserviceCreatePrivateNoteUpdateURL = "https://$FSDomain/api/v2/tickets/$TicketID/notes"
+
+        # Service Request item URL with unique request item ID
+        $FreshserviceUpdateServiceRequestItemStatusURL = "https://$FSDomain/api/v2/tickets/$TicketID/requested_items/$ServiceRequestItemID"
       }
     }
     catch {
@@ -257,73 +322,6 @@ elseif ($JsonOnly)
     }
   }
 }
-
-# Import Exchange PowerShell module to session.
-Import-Module ExchangeOnlineManagement
-
-# [REQUIRED] Set organization specific office and cubicle abbreviation values as well as resource type to be created.
-$OfficeAbbr = 'OF'
-$CubicleAbbr = 'WS'
-$ResourceType = 'Workspace'
-
-# [REQUIRED] Set organization name, domain, and Azure subscription ID if using managed identity.
-$OrganizationName = 'ORGANIZATION-NAME-HERE'
-$FSDomain = 'FRESH-SERVICE-DOMAIN-HERE'
-$DomainName = 'M365-DEFAULT-DOMAIN-HERE'
-$SubscriptionId = 'AZURE-SUBSCRIPTION-ID-HERE'
-$AdminGroup = 'MAIL-ENABLED-SECURITY-GROUP-HERE'
-
-# [OPTIONAL] Set Keyvault and credential name variables for retrieving credentials from Azure Keyvault to authenticate to other API supported systems such as an ITSM.
-$KeyvaultName = 'KEY-VAULT-NAME-HERE'
-$CredentialName = 'CREDENTIAL-NAME-HERE'
-
-
-# [OPTIONAL] Set API URLs for Freshservice tenant with unique ticket ID and service request item ID.
-
-# Private note URL with unique ticket ID.
-$FreshserviceCreatePrivateNoteUpdateURL = "https://$FSDomain/api/v2/tickets/$TicketID/notes"
-
-# Service Request item URL with unique request item ID
-$FreshserviceUpdateServiceRequestItemStatusURL = "https://$FSDomain/api/v2/tickets/$TicketID/requested_items/$ServiceRequestItemID"
-
-# [REQUIRED] Office locations
-$OfficeLocations = @(
-
-# Office 1 details
-  @{
-    Name = 'Main Campus'
-    RoomList = 'roomlist1@contoso.com'
-    Building = 'Bldg 1'
-    Street = '2 Microsoft Way'
-    City = 'Redmond'
-    State = 'WA'
-    Zipcode = '13464'
-    Country = 'United States'
-  }
-
-  # Office 2 details
-  @{
-    Name = 'Engineering Bldg'
-    RoomList = 'roomlist2@contoso.com'
-    Building = 'Bldg 2'
-    Street = '2 Microsoft Way'
-    City = 'Redmond'
-    State = 'WA'
-    Zipcode = '13464'
-    Country = 'United States'
-  }
-  # Office 3 details
-  @{
-    Name = 'Research & Development Bldg'
-    RoomList = 'roomlist3@contoso.com'
-    Building = 'Bldg 3'
-    Street = '3 Microsoft Way'
-    City = 'Redmond'
-    State = 'WA'
-    Zipcode = '13464'
-    Country = 'United States'
-  }
-)
 
 if ($KeyvaultName -and $CredentialName)
 {
